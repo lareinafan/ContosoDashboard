@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ContosoDashboard.Data;
+using ContosoDashboard.Models;
 using ContosoDashboard.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -107,6 +108,26 @@ app.UseRouting();
 // Enable authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Document download API endpoint
+app.MapGet("/api/documents/{id}/download", async (int id, HttpContext context, IDocumentService documentService, IFileStorageService storageService) =>
+{
+    var userIdClaim = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+    if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var document = await documentService.GetDocumentByIdAsync(id, userId);
+    if (document == null)
+    {
+        return Results.NotFound();
+    }
+
+    var stream = await storageService.DownloadAsync(document.FilePath);
+    var contentType = SupportedFileTypes.FileTypes.GetValueOrDefault(document.FileType, "application/octet-stream");
+    return Results.File(stream, contentType, document.FileName);
+}).RequireAuthorization();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");

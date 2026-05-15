@@ -5,6 +5,7 @@
 @attribute [Authorize]
 @inject IDashboardService DashboardService
 @inject INotificationService NotificationService
+@inject IDocumentService DocumentService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Dashboard - ContosoDashboard</PageTitle>
@@ -49,6 +50,14 @@
                     <div class="card-body">
                         <h5 class="card-title">Notifications</h5>
                         <p class="card-text display-4 text-danger">@summary.UnreadNotifications</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card summary-card">
+                    <div class="card-body">
+                        <h5 class="card-title">My Documents</h5>
+                        <p class="card-text display-4 text-secondary">@documentCount</p>
                     </div>
                 </div>
             </div>
@@ -126,6 +135,7 @@
     private List<Notification>? recentNotifications;
     private string userName = "User";
     private int currentUserId = 0;
+    private int documentCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -146,6 +156,8 @@
             summary = await DashboardService.GetDashboardSummaryAsync(currentUserId);
             announcements = await DashboardService.GetActiveAnnouncementsAsync();
             recentNotifications = await NotificationService.GetUserNotificationsAsync(currentUserId);
+            var docs = await DocumentService.GetDocumentsForUserAsync(currentUserId);
+            documentCount = docs.Count();
         }
     }
 

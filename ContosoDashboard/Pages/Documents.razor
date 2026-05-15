@@ -1,0 +1,206 @@
+@page "/documents"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using ContosoDashboard.Helpers
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Documents - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col d-flex justify-content-between align-items-center">
+            <h1>My Documents</h1>
+            <a href="/documents/upload" class="btn btn-primary">
+                <span class="bi bi-cloud-upload" aria-hidden="true"></span> Upload Document
+            </a>
+        </div>
+    </div>
+
+    <DocumentFilters OnFilterChanged="HandleFilterChanged" />
+
+    @if (documents == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (!filteredDocuments.Any())
+    {
+        <div class="alert alert-info">
+            <span class="bi bi-info-circle" aria-hidden="true"></span>
+            @if (documents.Any())
+            {
+                <span> No documents match your filters. Try adjusting your search criteria.</span>
+            }
+            else
+            {
+                <span> You don't have any documents yet. Click "Upload Document" to get started.</span>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>File Type</th>
+                    <th>Size</th>
+                    <th>Upload Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var doc in filteredDocuments)
+                {
+                    <tr>
+                        <td>
+                            <span class="@FileHelper.GetFileIcon(doc.FileName) me-1"></span>
+                            @doc.Title
+                        </td>
+                        <td><span class="badge bg-info">@doc.Category</span></td>
+                        <td>@Path.GetExtension(doc.FileName).TrimStart('.')</td>
+                        <td>@FileHelper.FormatFileSize(doc.FileSize)</td>
+                        <td>@doc.UploadDate.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/documents/@doc.DocumentId" class="btn btn-outline-primary" title="View">
+                                    <span class="bi bi-eye"></span>
+                                </a>
+                                <a href="/api/documents/@doc.DocumentId/download" class="btn btn-outline-success" title="Download">
+                                    <span class="bi bi-download"></span>
+                                </a>
+                                @if (doc.UploadedByUserId == currentUserId)
+                                {
+                                    <a href="/documents/@doc.DocumentId" class="btn btn-outline-info" title="Share">
+                                        <span class="bi bi-share"></span>
+                                    </a>
+                                    <button class="btn btn-outline-danger" title="Delete" @onclick="() => DeleteDocument(doc)">
+                                        <span class="bi bi-trash"></span>
+                                    </button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (showDeleteConfirm && documentToDelete != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Delete</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete "<strong>@documentToDelete.Title</strong>"?</p>
+                        <p class="text-danger">This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Document>? documents;
+    private List<Document> filteredDocuments = new();
+    private int currentUserId;
+    private DocumentFilterModel currentFilter = new();
+    private bool showDeleteConfirm;
+    private Document? documentToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+        {
+            currentUserId = userId;
+        }
+
+        if (currentUserId > 0)
+        {
+            var docs = await DocumentService.GetDocumentsForUserAsync(currentUserId);
+            documents = docs.ToList();
+            ApplyFilters();
+        }
+    }
+
+    private void HandleFilterChanged(DocumentFilterModel filter)
+    {
+        currentFilter = filter;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (documents == null)
+        {
+            filteredDocuments = new();
+            return;
+        }
+
+        var query = documents.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(currentFilter.Category))
+        {
+            query = query.Where(d => d.Category == currentFilter.Category);
+        }
+
+        if (!string.IsNullOrEmpty(currentFilter.SearchText))
+        {
+            var search = currentFilter.SearchText.ToLowerInvariant();
+            query = query.Where(d =>
+                d.Title.ToLowerInvariant().Contains(search) ||
+                (d.Description?.ToLowerInvariant().Contains(search) ?? false) ||
+                d.FileName.ToLowerInvariant().Contains(search) ||
+                (d.Tags?.ToLowerInvariant().Contains(search) ?? false));
+        }
+
+        if (!string.IsNullOrEmpty(currentFilter.FileType))
+        {
+            query = query.Where(d =>
+                Path.GetExtension(d.FileName).Equals(currentFilter.FileType, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filteredDocuments = query.OrderByDescending(d => d.UploadDate).ToList();
+    }
+
+    private void DeleteDocument(Document doc)
+    {
+        documentToDelete = doc;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+        documentToDelete = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (documentToDelete != null)
+        {
+            await DocumentService.DeleteDocumentAsync(documentToDelete.DocumentId, currentUserId);
+            documents?.Remove(documentToDelete);
+            ApplyFilters();
+        }
+        showDeleteConfirm = false;
+        documentToDelete = null;
+    }
+}

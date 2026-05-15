@@ -1,0 +1,47 @@
+@using ContosoDashboard.Models
+@using ContosoDashboard.Helpers
+
+<div class="card h-100">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+            <span class="@FileHelper.GetFileIcon(Document.FileName) fs-3 me-2 text-primary"></span>
+            <div>
+                <h6 class="card-title mb-0">@Document.Title</h6>
+                <small class="text-muted">@Document.FileName</small>
+            </div>
+        </div>
+        <div class="mb-2">
+            <span class="badge bg-info">@Document.Category</span>
+        </div>
+        <div class="d-flex justify-content-between text-muted small">
+            <span>@FileHelper.FormatFileSize(Document.FileSize)</span>
+            <span>@Document.UploadDate.ToString("MMM dd, yyyy")</span>
+        </div>
+    </div>
+    <div class="card-footer bg-transparent">
+        <div class="btn-group btn-group-sm w-100">
+            <a href="/documents/@Document.DocumentId" class="btn btn-outline-primary">
+                <span class="bi bi-eye" aria-hidden="true"></span> View
+            </a>
+            <a href="/api/documents/@Document.DocumentId/download" class="btn btn-outline-success">
+                <span class="bi bi-download" aria-hidden="true"></span> Download
+            </a>
+            @if (ShowActions)
+            {
+                <button class="btn btn-outline-info" @onclick="() => OnShare.InvokeAsync(Document)">
+                    <span class="bi bi-share" aria-hidden="true"></span> Share
+                </button>
+                <button class="btn btn-outline-danger" @onclick="() => OnDelete.InvokeAsync(Document)">
+                    <span class="bi bi-trash" aria-hidden="true"></span> Delete
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Document Document { get; set; } = null!;
+    [Parameter] public EventCallback<Document> OnDelete { get; set; }
+    [Parameter] public EventCallback<Document> OnShare { get; set; }
+    [Parameter] public bool ShowActions { get; set; } = true;
+}

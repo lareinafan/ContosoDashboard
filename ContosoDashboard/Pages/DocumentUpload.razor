@@ -1,0 +1,281 @@
+@page "/documents/upload"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using ContosoDashboard.Helpers
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Security.Claims
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize]
+@implements IDisposable
+@inject IDocumentService DocumentService
+@inject IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Upload Document - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Upload Document</h1>
+            <p class="text-muted">Upload a new document to your library</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <EditForm Model="@uploadModel" OnValidSubmit="HandleUpload">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">@errorMessage</div>
+                        }
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success">@successMessage</div>
+                        }
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title <span class="text-danger">*</span></label>
+                            <InputText id="title" class="form-control" @bind-Value="uploadModel.Title" />
+                            <ValidationMessage For="@(() => uploadModel.Title)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <InputTextArea id="description" class="form-control" rows="3" @bind-Value="uploadModel.Description" />
+                            <ValidationMessage For="@(() => uploadModel.Description)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
+                            <InputSelect id="category" class="form-select" @bind-Value="uploadModel.Category">
+                                <option value="">Select a category...</option>
+                                @foreach (var category in DocumentCategories.All)
+                                {
+                                    <option value="@category">@category</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => uploadModel.Category)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tags" class="form-label">Tags</label>
+                            <InputText id="tags" class="form-control" @bind-Value="uploadModel.Tags" placeholder="Comma-separated tags" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="project" class="form-label">Project (optional)</label>
+                            <InputSelect id="project" class="form-select" @bind-Value="uploadModel.ProjectId">
+                                <option value="">No project</option>
+                                @if (userProjects != null)
+                                {
+                                    @foreach (var project in userProjects)
+                                    {
+                                        <option value="@project.ProjectId">@project.Name</option>
+                                    }
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="file" class="form-label">File <span class="text-danger">*</span></label>
+                            <InputFile id="file" class="form-control" OnChange="HandleFileSelected" />
+                            <div class="form-text">
+                                Supported types: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, JPG, PNG.
+                                Max size: @FileHelper.FormatFileSize(SupportedFileTypes.MaxFileSizeBytes).
+                            </div>
+                        </div>
+
+                        @if (selectedFile != null)
+                        {
+                            <div class="mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex align-items-center">
+                                            <span class="@FileHelper.GetFileIcon(selectedFile.Name) fs-4 me-2"></span>
+                                            <div>
+                                                <strong>@selectedFile.Name</strong><br />
+                                                <small class="text-muted">@FileHelper.FormatFileSize(selectedFile.Size)</small>
+                                            </div>
+                                            @if (fileValidationErrors.Any())
+                                            {
+                                                <span class="bi bi-exclamation-triangle text-danger ms-auto fs-4"></span>
+                                            }
+                                            else
+                                            {
+                                                <span class="bi bi-check-circle text-success ms-auto fs-4"></span>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        @if (fileValidationErrors.Any())
+                        {
+                            <div class="alert alert-warning">
+                                <ul class="mb-0">
+                                    @foreach (var error in fileValidationErrors)
+                                    {
+                                        <li>@error</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
+                        @if (isUploading)
+                        {
+                            <div class="mb-3">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                         role="progressbar" style="width: 100%">
+                                        Uploading...
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary"
+                                    disabled="@(isUploading || selectedFile == null || fileValidationErrors.Any())">
+                                <span class="bi bi-cloud-upload" aria-hidden="true"></span> Upload
+                            </button>
+                            <a href="/documents" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UploadModel uploadModel = new();
+    private IBrowserFile? selectedFile;
+    private MemoryStream? fileStream;
+    private List<string> fileValidationErrors = new();
+    private bool isUploading;
+    private string? errorMessage;
+    private string? successMessage;
+    private int currentUserId;
+    private List<Project>? userProjects;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+        {
+            currentUserId = userId;
+        }
+
+        if (currentUserId > 0)
+        {
+            userProjects = await ProjectService.GetUserProjectsAsync(currentUserId);
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        fileValidationErrors.Clear();
+        errorMessage = null;
+        successMessage = null;
+
+        // T030: Client-side file validation
+        var extension = Path.GetExtension(selectedFile.Name);
+        if (!SupportedFileTypes.IsSupported(extension))
+        {
+            fileValidationErrors.Add($"File type '{extension}' is not supported.");
+        }
+
+        if (selectedFile.Size > SupportedFileTypes.MaxFileSizeBytes)
+        {
+            fileValidationErrors.Add(
+                $"File size ({FileHelper.FormatFileSize(selectedFile.Size)}) exceeds the maximum allowed size of {FileHelper.FormatFileSize(SupportedFileTypes.MaxFileSizeBytes)}.");
+        }
+
+        // Copy IBrowserFile stream to MemoryStream immediately (critical for Blazor Server)
+        if (!fileValidationErrors.Any())
+        {
+            fileStream?.Dispose();
+            fileStream = new MemoryStream();
+            await selectedFile.OpenReadStream(SupportedFileTypes.MaxFileSizeBytes).CopyToAsync(fileStream);
+            fileStream.Position = 0;
+        }
+    }
+
+    private async Task HandleUpload()
+    {
+        if (selectedFile == null || fileStream == null || fileValidationErrors.Any())
+            return;
+
+        isUploading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            fileStream.Position = 0;
+            var extension = Path.GetExtension(selectedFile.Name);
+            var contentType = SupportedFileTypes.FileTypes.GetValueOrDefault(extension, "application/octet-stream");
+
+            int? projectId = null;
+            if (!string.IsNullOrEmpty(uploadModel.ProjectId))
+            {
+                projectId = int.Parse(uploadModel.ProjectId);
+            }
+
+            await DocumentService.UploadDocumentAsync(
+                fileStream,
+                selectedFile.Name,
+                contentType,
+                uploadModel.Title,
+                uploadModel.Description ?? "",
+                uploadModel.Category,
+                currentUserId,
+                projectId,
+                uploadModel.Tags);
+
+            NavigationManager.NavigateTo("/documents");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        fileStream?.Dispose();
+    }
+
+    private class UploadModel
+    {
+        [Required(ErrorMessage = "Title is required")]
+        [MaxLength(200, ErrorMessage = "Title cannot exceed 200 characters")]
+        public string Title { get; set; } = "";
+
+        [MaxLength(2000, ErrorMessage = "Description cannot exceed 2000 characters")]
+        public string? Description { get; set; }
+
+        [Required(ErrorMessage = "Category is required")]
+        public string Category { get; set; } = "";
+
+        [MaxLength(500)]
+        public string? Tags { get; set; }
+
+        public string? ProjectId { get; set; }
+    }
+}

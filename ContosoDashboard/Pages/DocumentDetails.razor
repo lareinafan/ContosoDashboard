@@ -1,0 +1,231 @@
+@page "/documents/{DocumentId:int}"
+@using ContosoDashboard.Services
+@using ContosoDashboard.Models
+@using ContosoDashboard.Helpers
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IDocumentService DocumentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Document Details - ContosoDashboard</PageTitle>
+
+<div class="container-fluid">
+    @if (document == null)
+    {
+        @if (notFound)
+        {
+            <div class="alert alert-warning">
+                <span class="bi bi-exclamation-triangle" aria-hidden="true"></span>
+                Document not found or you don't have access.
+            </div>
+            <a href="/documents" class="btn btn-secondary">
+                <span class="bi bi-arrow-left" aria-hidden="true"></span> Back to Documents
+            </a>
+        }
+        else
+        {
+            <p><em>Loading...</em></p>
+        }
+    }
+    else
+    {
+        <div class="row mb-4">
+            <div class="col d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>@document.Title</h1>
+                    <p class="text-muted mb-0">
+                        Uploaded by @document.UploadedByUser.DisplayName on @document.UploadDate.ToString("MMM dd, yyyy HH:mm")
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/api/documents/@document.DocumentId/download" class="btn btn-success">
+                        <span class="bi bi-download" aria-hidden="true"></span> Download
+                    </a>
+                    @if (isOwner)
+                    {
+                        <a href="/documents/@document.DocumentId/edit" class="btn btn-primary">
+                            <span class="bi bi-pencil" aria-hidden="true"></span> Edit
+                        </a>
+                        <button class="btn btn-danger" @onclick="ShowDeleteConfirmation">
+                            <span class="bi bi-trash" aria-hidden="true"></span> Delete
+                        </button>
+                    }
+                    <a href="/documents" class="btn btn-outline-secondary">
+                        <span class="bi bi-arrow-left" aria-hidden="true"></span> Back
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Document Information</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(document.Description))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Description</label>
+                                <p>@document.Description</p>
+                            </div>
+                        }
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted">Category</label>
+                                <p><span class="badge bg-info">@document.Category</span></p>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-muted">Tags</label>
+                                <p>
+                                    @if (!string.IsNullOrEmpty(document.Tags))
+                                    {
+                                        @foreach (var tag in document.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                        {
+                                            <span class="badge bg-secondary me-1">@tag</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">No tags</span>
+                                    }
+                                </p>
+                            </div>
+                        </div>
+
+                        @if (document.Project != null)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Project</label>
+                                <p>
+                                    <a href="/projects/@document.Project.ProjectId">@document.Project.Name</a>
+                                </p>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">File Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted">File Name</label>
+                                <p>
+                                    <span class="@FileHelper.GetFileIcon(document.FileName) me-1"></span>
+                                    @document.FileName
+                                </p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted">File Type</label>
+                                <p>@Path.GetExtension(document.FileName).TrimStart('.')</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted">File Size</label>
+                                <p>@FileHelper.FormatFileSize(document.FileSize)</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted">Upload Date</label>
+                                <p>@document.UploadDate.ToString("MMM dd, yyyy HH:mm")</p>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label text-muted">Last Updated</label>
+                                <p>@document.UpdatedDate.ToString("MMM dd, yyyy HH:mm")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                @if (isOwner)
+                {
+                    <DocumentSharePanel DocumentId="@document.DocumentId" CurrentUserId="@currentUserId" />
+                }
+            </div>
+        </div>
+
+        @if (showDeleteConfirm)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirm Delete</h5>
+                            <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete "<strong>@document.Title</strong>"?</p>
+                            <p class="text-danger">This action cannot be undone. All shares will be removed.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                            <button class="btn btn-danger" @onclick="ConfirmDelete">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public int DocumentId { get; set; }
+
+    private Document? document;
+    private int currentUserId;
+    private bool isOwner;
+    private bool notFound;
+    private bool showDeleteConfirm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+        {
+            currentUserId = userId;
+        }
+
+        if (currentUserId > 0)
+        {
+            document = await DocumentService.GetDocumentByIdAsync(DocumentId, currentUserId);
+            if (document == null)
+            {
+                notFound = true;
+            }
+            else
+            {
+                isOwner = document.UploadedByUserId == currentUserId;
+            }
+        }
+    }
+
+    private void ShowDeleteConfirmation()
+    {
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (document != null)
+        {
+            await DocumentService.DeleteDocumentAsync(document.DocumentId, currentUserId);
+            NavigationManager.NavigateTo("/documents");
+        }
+    }
+}

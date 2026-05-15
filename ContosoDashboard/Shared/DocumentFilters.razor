@@ -1,0 +1,78 @@
+@using ContosoDashboard.Models
+
+<div class="row g-2 mb-3">
+    <div class="col-md-3">
+        <select class="form-select" value="@selectedCategory" @onchange="OnCategoryChanged">
+            <option value="">All Categories</option>
+            @foreach (var category in DocumentCategories.All)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <div class="input-group">
+            <span class="input-group-text"><span class="bi bi-search"></span></span>
+            <input type="text" class="form-control" placeholder="Search documents..."
+                   value="@searchText" @oninput="OnSearchInput" />
+        </div>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" value="@selectedFileType" @onchange="OnFileTypeChanged">
+            <option value="">All File Types</option>
+            @foreach (var ext in SupportedFileTypes.FileTypes.Keys)
+            {
+                <option value="@ext">@ext.TrimStart('.')</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">
+            <span class="bi bi-x-circle" aria-hidden="true"></span> Clear
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback<DocumentFilterModel> OnFilterChanged { get; set; }
+
+    private string selectedCategory = "";
+    private string searchText = "";
+    private string selectedFileType = "";
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        selectedCategory = e.Value?.ToString() ?? "";
+        await NotifyFilterChanged();
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        await NotifyFilterChanged();
+    }
+
+    private async Task OnFileTypeChanged(ChangeEventArgs e)
+    {
+        selectedFileType = e.Value?.ToString() ?? "";
+        await NotifyFilterChanged();
+    }
+
+    private async Task ClearFilters()
+    {
+        selectedCategory = "";
+        searchText = "";
+        selectedFileType = "";
+        await NotifyFilterChanged();
+    }
+
+    private async Task NotifyFilterChanged()
+    {
+        await OnFilterChanged.InvokeAsync(new DocumentFilterModel
+        {
+            Category = string.IsNullOrEmpty(selectedCategory) ? null : selectedCategory,
+            SearchText = string.IsNullOrEmpty(searchText) ? null : searchText,
+            FileType = string.IsNullOrEmpty(selectedFileType) ? null : selectedFileType
+        });
+    }
+}

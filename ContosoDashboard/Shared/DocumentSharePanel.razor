@@ -1,0 +1,148 @@
+@using ContosoDashboard.Models
+@using ContosoDashboard.Services
+
+@inject IDocumentShareService DocumentShareService
+@inject IUserService UserService
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><span class="bi bi-share" aria-hidden="true"></span> Shared With</h5>
+    </div>
+    <div class="card-body">
+        @if (shares == null)
+        {
+            <p class="text-muted">Loading shares...</p>
+        }
+        else if (!shares.Any())
+        {
+            <p class="text-muted">This document hasn't been shared with anyone yet.</p>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush mb-3">
+                @foreach (var share in shares)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>@share.SharedWithUser.DisplayName</strong>
+                            <br />
+                            <small class="text-muted">Shared on @share.SharedDate.ToString("MMM dd, yyyy")</small>
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="() => RevokeShare(share.DocumentShareId)">
+                            <span class="bi bi-x-circle" aria-hidden="true"></span> Revoke
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        <div class="input-group">
+            <select class="form-select" @bind="selectedUserId">
+                <option value="0">Select a user to share with...</option>
+                @if (availableUsers != null)
+                {
+                    @foreach (var user in availableUsers)
+                    {
+                        <option value="@user.UserId">@user.DisplayName (@user.Email)</option>
+                    }
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="ShareDocument" disabled="@(selectedUserId == 0)">
+                <span class="bi bi-plus-circle" aria-hidden="true"></span> Share
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int DocumentId { get; set; }
+    [Parameter, EditorRequired] public int CurrentUserId { get; set; }
+
+    private IEnumerable<DocumentShare>? shares;
+    private List<User>? availableUsers;
+    private int selectedUserId;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadShares();
+        await LoadAvailableUsers();
+    }
+
+    private async Task LoadShares()
+    {
+        try
+        {
+            shares = await DocumentShareService.GetSharesForDocumentAsync(DocumentId, CurrentUserId);
+        }
+        catch
+        {
+            shares = Enumerable.Empty<DocumentShare>();
+        }
+    }
+
+    private async Task LoadAvailableUsers()
+    {
+        var allUsers = await UserService.GetAllUsersAsync();
+        var sharedUserIds = shares?.Select(s => s.SharedWithUserId).ToHashSet() ?? new HashSet<int>();
+        availableUsers = allUsers
+            .Where(u => u.UserId != CurrentUserId && !sharedUserIds.Contains(u.UserId))
+            .ToList();
+    }
+
+    private async Task ShareDocument()
+    {
+        if (selectedUserId == 0) return;
+
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            await DocumentShareService.ShareDocumentAsync(DocumentId, selectedUserId, CurrentUserId);
+            successMessage = "Document shared successfully.";
+            selectedUserId = 0;
+            await LoadShares();
+            await LoadAvailableUsers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task RevokeShare(int documentShareId)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await DocumentShareService.RevokeShareAsync(documentShareId, CurrentUserId);
+            if (result)
+            {
+                successMessage = "Share revoked successfully.";
+                await LoadShares();
+                await LoadAvailableUsers();
+            }
+            else
+            {
+                errorMessage = "Failed to revoke share.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}
