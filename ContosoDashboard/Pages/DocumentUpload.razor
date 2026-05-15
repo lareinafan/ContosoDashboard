@@ -180,6 +180,15 @@
         {
             userProjects = await ProjectService.GetUserProjectsAsync(currentUserId);
         }
+
+        // Pre-select project from query string (e.g., /documents/upload?projectId=1)
+        var uri = new Uri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var projectIdParam = query["projectId"];
+        if (!string.IsNullOrEmpty(projectIdParam))
+        {
+            uploadModel.ProjectId = projectIdParam;
+        }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)

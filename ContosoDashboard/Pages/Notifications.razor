@@ -35,11 +35,12 @@
                             <div class="d-flex w-100 justify-content-between align-items-start">
                                 <div class="flex-grow-1">
                                     <div class="d-flex align-items-center mb-1">
+                                        <span class="@GetNotificationIcon(notification.Type) me-2 fs-5"></span>
                                         <h6 class="mb-0 me-2">@notification.Title</h6>
                                         <span class="badge bg-@GetPriorityColor(notification.Priority)">
                                             @notification.Priority
                                         </span>
-                                        <span class="badge bg-secondary ms-2">@notification.Type</span>
+                                        <span class="badge bg-@GetTypeColor(notification.Type) ms-2">@GetTypeLabel(notification.Type)</span>
                                     </div>
                                     <p class="mb-1">@notification.Message</p>
                                     <small class="text-muted">@GetRelativeTime(notification.CreatedDate)</small>
@@ -151,5 +152,53 @@
             return $"{(int)timeSpan.TotalDays} days ago";
 
         return dateTime.ToString("MMM dd, yyyy");
+    }
+
+    private string GetNotificationIcon(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.TaskAssignment => "bi bi-person-check text-primary",
+            NotificationType.TaskUpdate => "bi bi-pencil-square text-info",
+            NotificationType.TaskDueSoon => "bi bi-clock text-warning",
+            NotificationType.TaskCompleted => "bi bi-check-circle text-success",
+            NotificationType.TaskComment => "bi bi-chat-dots text-secondary",
+            NotificationType.ProjectUpdate => "bi bi-folder text-primary",
+            NotificationType.SystemAnnouncement => "bi bi-megaphone text-danger",
+            NotificationType.DocumentShared => "bi bi-share text-info",
+            NotificationType.ProjectDocumentUploaded => "bi bi-file-earmark-arrow-up text-success",
+            _ => "bi bi-bell text-secondary"
+        };
+    }
+
+    private string GetTypeColor(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.DocumentShared => "info",
+            NotificationType.ProjectDocumentUploaded => "success",
+            NotificationType.TaskAssignment or NotificationType.TaskUpdate => "primary",
+            NotificationType.TaskDueSoon => "warning",
+            NotificationType.TaskCompleted => "success",
+            NotificationType.SystemAnnouncement => "danger",
+            _ => "secondary"
+        };
+    }
+
+    private string GetTypeLabel(NotificationType type)
+    {
+        return type switch
+        {
+            NotificationType.TaskAssignment => "Task Assigned",
+            NotificationType.TaskUpdate => "Task Updated",
+            NotificationType.TaskDueSoon => "Due Soon",
+            NotificationType.TaskCompleted => "Completed",
+            NotificationType.TaskComment => "Comment",
+            NotificationType.ProjectUpdate => "Project",
+            NotificationType.SystemAnnouncement => "Announcement",
+            NotificationType.DocumentShared => "Document Shared",
+            NotificationType.ProjectDocumentUploaded => "Document Uploaded",
+            _ => type.ToString()
+        };
     }
 }

@@ -27,6 +27,12 @@
     {
         <p><em>Loading...</em></p>
     }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            <span class="bi bi-exclamation-triangle" aria-hidden="true"></span> @errorMessage
+        </div>
+    }
     else if (!filteredDocuments.Any())
     {
         <div class="alert alert-info">
@@ -121,6 +127,7 @@
     private DocumentFilterModel currentFilter = new();
     private bool showDeleteConfirm;
     private Document? documentToDelete;
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,9 +141,17 @@
 
         if (currentUserId > 0)
         {
-            var docs = await DocumentService.GetDocumentsForUserAsync(currentUserId);
-            documents = docs.ToList();
-            ApplyFilters();
+            try
+            {
+                var docs = await DocumentService.GetDocumentsForUserAsync(currentUserId);
+                documents = docs.ToList();
+                ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to load documents: {ex.Message}";
+                documents = new();
+            }
         }
     }
 
@@ -196,9 +211,16 @@
     {
         if (documentToDelete != null)
         {
-            await DocumentService.DeleteDocumentAsync(documentToDelete.DocumentId, currentUserId);
-            documents?.Remove(documentToDelete);
-            ApplyFilters();
+            try
+            {
+                await DocumentService.DeleteDocumentAsync(documentToDelete.DocumentId, currentUserId);
+                documents?.Remove(documentToDelete);
+                ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to delete document: {ex.Message}";
+            }
         }
         showDeleteConfirm = false;
         documentToDelete = null;

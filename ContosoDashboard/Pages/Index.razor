@@ -95,6 +95,12 @@
                 <a href="/projects" class="list-group-item list-group-item-action">
                     <i class="bi bi-folder"></i> View My Projects
                 </a>
+                <a href="/documents" class="list-group-item list-group-item-action">
+                    <i class="bi bi-file-earmark"></i> View My Documents
+                </a>
+                <a href="/documents/upload" class="list-group-item list-group-item-action">
+                    <i class="bi bi-cloud-upload"></i> Upload Document
+                </a>
                 <a href="/notifications" class="list-group-item list-group-item-action">
                     <i class="bi bi-bell"></i> View Notifications
                 </a>
@@ -127,12 +133,55 @@
             }
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Recent Documents</h3>
+                <a href="/documents" class="btn btn-outline-primary btn-sm">View All</a>
+            </div>
+            @if (recentDocuments != null && recentDocuments.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Category</th>
+                                <th>Upload Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var doc in recentDocuments)
+                            {
+                                <tr>
+                                    <td>
+                                        <a href="/documents/@doc.DocumentId">
+                                            <span class="@Helpers.FileHelper.GetFileIcon(doc.FileName) me-1"></span>
+                                            @doc.Title
+                                        </a>
+                                    </td>
+                                    <td><span class="badge bg-info">@doc.Category</span></td>
+                                    <td>@doc.UploadDate.ToString("MMM dd, yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No documents yet. <a href="/documents/upload">Upload your first document</a>.</p>
+            }
+        </div>
+    </div>
 </div>
 
 @code {
     private DashboardSummary? summary;
     private List<Announcement>? announcements;
     private List<Notification>? recentNotifications;
+    private List<Document>? recentDocuments;
     private string userName = "User";
     private int currentUserId = 0;
     private int documentCount = 0;
@@ -157,7 +206,9 @@
             announcements = await DashboardService.GetActiveAnnouncementsAsync();
             recentNotifications = await NotificationService.GetUserNotificationsAsync(currentUserId);
             var docs = await DocumentService.GetDocumentsForUserAsync(currentUserId);
-            documentCount = docs.Count();
+            var docsList = docs.ToList();
+            documentCount = docsList.Count;
+            recentDocuments = docsList.OrderByDescending(d => d.UploadDate).Take(5).ToList();
         }
     }
 

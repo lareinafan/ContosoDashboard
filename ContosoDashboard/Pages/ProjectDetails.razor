@@ -1,10 +1,12 @@
 @page "/projects/{projectId:int}"
 @using ContosoDashboard.Services
 @using ContosoDashboard.Models
+@using ContosoDashboard.Helpers
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 @attribute [Authorize]
 @inject IProjectService ProjectService
+@inject IDocumentService DocumentService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
@@ -155,6 +157,48 @@
 
             <div class="col-md-4">
                 <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Project Documents</h5>
+                        <a href="/documents/upload?projectId=@ProjectId" class="btn btn-sm btn-primary">
+                            <span class="bi bi-cloud-upload" aria-hidden="true"></span> Upload
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        @if (projectDocuments == null)
+                        {
+                            <p class="text-muted"><em>Loading documents...</em></p>
+                        }
+                        else if (!projectDocuments.Any())
+                        {
+                            <p class="text-muted">No documents uploaded to this project yet.</p>
+                        }
+                        else
+                        {
+                            <div class="list-group list-group-flush">
+                                @foreach (var doc in projectDocuments.Take(10))
+                                {
+                                    <a href="/documents/@doc.DocumentId" class="list-group-item list-group-item-action px-0">
+                                        <div class="d-flex align-items-center">
+                                            <span class="@FileHelper.GetFileIcon(doc.FileName) fs-5 me-2 text-primary"></span>
+                                            <div class="flex-grow-1 text-truncate">
+                                                <strong class="d-block text-truncate">@doc.Title</strong>
+                                                <small class="text-muted">@FileHelper.FormatFileSize(doc.FileSize) &middot; @doc.UploadDate.ToString("MMM dd, yyyy")</small>
+                                            </div>
+                                        </div>
+                                    </a>
+                                }
+                            </div>
+                            @if (projectDocuments.Count() > 10)
+                            {
+                                <div class="mt-2 text-center">
+                                    <a href="/documents" class="btn btn-sm btn-outline-primary">View all documents</a>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="mb-0">Team Members</h5>
                     </div>
@@ -237,6 +281,7 @@
     public int ProjectId { get; set; }
 
     private Project? project;
+    private IEnumerable<Document>? projectDocuments;
     private int currentUserId = 0;
 
     protected override async Task OnInitializedAsync()
@@ -253,6 +298,17 @@
         if (currentUserId > 0)
         {
             project = await ProjectService.GetProjectByIdAsync(ProjectId, currentUserId);
+            if (project != null)
+            {
+                try
+                {
+                    projectDocuments = await DocumentService.GetDocumentsForProjectAsync(ProjectId, currentUserId);
+                }
+                catch
+                {
+                    projectDocuments = Enumerable.Empty<Document>();
+                }
+            }
         }
         
         if (project == null)

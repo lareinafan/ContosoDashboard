@@ -14,7 +14,16 @@
 <div class="container-fluid">
     @if (document == null)
     {
-        @if (notFound)
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">
+                <span class="bi bi-exclamation-triangle" aria-hidden="true"></span> @errorMessage
+            </div>
+            <a href="/documents" class="btn btn-secondary">
+                <span class="bi bi-arrow-left" aria-hidden="true"></span> Back to Documents
+            </a>
+        }
+        else if (notFound)
         {
             <div class="alert alert-warning">
                 <span class="bi bi-exclamation-triangle" aria-hidden="true"></span>
@@ -185,6 +194,7 @@
     private bool isOwner;
     private bool notFound;
     private bool showDeleteConfirm;
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -198,14 +208,22 @@
 
         if (currentUserId > 0)
         {
-            document = await DocumentService.GetDocumentByIdAsync(DocumentId, currentUserId);
-            if (document == null)
+            try
             {
-                notFound = true;
+                document = await DocumentService.GetDocumentByIdAsync(DocumentId, currentUserId);
+                if (document == null)
+                {
+                    notFound = true;
+                }
+                else
+                {
+                    isOwner = document.UploadedByUserId == currentUserId;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                isOwner = document.UploadedByUserId == currentUserId;
+                errorMessage = $"Failed to load document: {ex.Message}";
+                notFound = true;
             }
         }
     }
@@ -224,8 +242,16 @@
     {
         if (document != null)
         {
-            await DocumentService.DeleteDocumentAsync(document.DocumentId, currentUserId);
-            NavigationManager.NavigateTo("/documents");
+            try
+            {
+                await DocumentService.DeleteDocumentAsync(document.DocumentId, currentUserId);
+                NavigationManager.NavigateTo("/documents");
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Failed to delete document: {ex.Message}";
+                showDeleteConfirm = false;
+            }
         }
     }
 }

@@ -51,6 +51,16 @@ builder.Services.AddScoped<IDocumentShareService, DocumentShareService>();
 // Add HttpContextAccessor for accessing user claims
 builder.Services.AddHttpContextAccessor();
 
+// Configure file upload size limits (25 MB + buffer)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 26_214_400;
+});
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 26_214_400;
+});
+
 var app = builder.Build();
 
 // Initialize database

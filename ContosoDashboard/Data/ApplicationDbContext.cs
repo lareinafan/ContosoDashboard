@@ -273,5 +273,54 @@ public class ApplicationDbContext : DbContext
                 IsActive = true
             }
         );
+
+        // Seed sample documents
+        modelBuilder.Entity<Document>().HasData(
+            new Document
+            {
+                DocumentId = 1,
+                Title = "Project Requirements",
+                Description = "Initial requirements document for the ContosoDashboard project",
+                Category = "Project Documents",
+                FileName = "requirements.pdf",
+                FilePath = "AppData/uploads/sample1.pdf",
+                FileSize = 102400,
+                FileType = ".pdf",
+                UploadedByUserId = 1,
+                ProjectId = 1,
+                UploadDate = new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc),
+                UpdatedDate = new DateTime(2026, 1, 15, 10, 0, 0, DateTimeKind.Utc)
+            },
+            new Document
+            {
+                DocumentId = 2,
+                Title = "Team Guidelines",
+                Description = "Development team guidelines and coding standards",
+                Category = "Team Resources",
+                FileName = "guidelines.docx",
+                FilePath = "AppData/uploads/sample2.docx",
+                FileSize = 51200,
+                FileType = ".docx",
+                UploadedByUserId = 2,
+                ProjectId = null,
+                UploadDate = new DateTime(2026, 1, 20, 14, 30, 0, DateTimeKind.Utc),
+                UpdatedDate = new DateTime(2026, 1, 20, 14, 30, 0, DateTimeKind.Utc)
+            },
+            new Document
+            {
+                DocumentId = 3,
+                Title = "Sprint Planning Notes",
+                Description = "Notes from the latest sprint planning session",
+                Category = "Project Documents",
+                FileName = "sprint-planning.txt",
+                FilePath = "AppData/uploads/sample3.txt",
+                FileSize = 8192,
+                FileType = ".txt",
+                UploadedByUserId = 3,
+                ProjectId = 1,
+                UploadDate = new DateTime(2026, 2, 1, 9, 0, 0, DateTimeKind.Utc),
+                UpdatedDate = new DateTime(2026, 2, 1, 9, 0, 0, DateTimeKind.Utc)
+            }
+        );
     }
 }

@@ -116,6 +116,10 @@
                                 @if (task.Project != null)
                                 {
                                     <a href="/projects/@task.ProjectId">@task.Project.Name</a>
+                                    <br />
+                                    <a href="/projects/@task.ProjectId" class="text-muted small">
+                                        <span class="bi bi-file-earmark me-1"></span>Docs
+                                    </a>
                                 }
                                 else
                                 {
