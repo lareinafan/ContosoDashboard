@@ -6,7 +6,7 @@ Add document upload and management capabilities to ContosoDashboard, enabling em
 
 **Source**: `StakeholderDocs/document-upload-and-management-feature.md`
 **Feature Branch**: `feature/document-upload-and-management`
-**Status**: Draft
+**Status**: Clarified
 **Created**: 2026-05-15
 
 ---
@@ -319,6 +319,52 @@ Given a document under 25 MB
 When the user clicks "Preview"
 Then the preview loads within 3 seconds
 ```
+
+---
+
+## Clarifications (Edge Cases and Ambiguity Resolution)
+
+_The following clarifications resolve ambiguous areas identified during specification review._
+
+### C1: Documents when user is removed from a project
+**Question**: What happens to documents a user uploaded to a project when that user is removed from the project?
+**Resolution**: Documents remain associated with the project. The original uploader retains ownership (can still edit/delete via "My Documents") but project access is governed by current membership. The document continues to be visible to current project members.
+
+### C2: Special characters in filenames
+**Question**: How should the system handle special characters, unicode, or very long filenames?
+**Resolution**: Original filenames are stored in the `FileName` metadata field for display purposes only. The actual stored file uses a GUID-based name (`{guid}.{ext}`), so special characters in the original filename never affect storage. Display of the original filename should be truncated to 100 characters in list views with a tooltip showing the full name.
+
+### C3: Concurrent uploads of the same file
+**Question**: What happens if the same user uploads the same file twice?
+**Resolution**: Each upload creates a separate document record with a unique GUID-based storage path. Duplicate files are allowed — the system does not deduplicate. Users may upload the same file multiple times (e.g., to different projects or categories).
+
+### C4: Document access after sharing is revoked
+**Question**: Can document owners revoke sharing? What happens to the shared user's access?
+**Resolution**: Document owners can revoke sharing at any time by removing users from the share list. Once revoked, the document immediately disappears from the recipient's "Shared with Me" view and they can no longer download or preview it. No notification is sent on share revocation.
+
+### C5: Maximum number of documents per user
+**Question**: Is there a limit on total documents per user or total storage?
+**Resolution**: No per-user document limit or storage quota in the initial release. Storage quotas are explicitly out of scope. However, the document list view must handle up to 500 documents efficiently (pagination required if more than 50 documents per page).
+
+### C6: File upload interruption/failure recovery
+**Question**: What happens if the upload fails midway (e.g., network timeout, browser crash)?
+**Resolution**: The upload workflow saves the file to disk before creating the database record. If the file save fails, no database record is created (no orphaned records). If the database insert fails after file save, the orphaned file on disk is acceptable for the training implementation — a cleanup mechanism is out of scope. The user sees an error message and can retry.
+
+### C7: Handling of zero-byte files
+**Question**: Should the system accept zero-byte (empty) files?
+**Resolution**: No. The system should reject files with 0 bytes with an error message "File is empty. Please select a valid file." Minimum file size is 1 byte.
+
+### C8: Category management — can users add custom categories?
+**Question**: Are the predefined categories fixed, or can users create custom categories?
+**Resolution**: Categories are fixed to the predefined list (Project Documents, Team Resources, Personal Files, Reports, Presentations, Other). Users cannot create custom categories in the initial release. Custom categories may be added in a future version.
+
+### C9: Documents and task deletion
+**Question**: What happens to documents attached to a task when the task is deleted?
+**Resolution**: Documents remain in the system — they are not deleted when a task is deleted. The task-document association is removed, but the document continues to exist in the user's "My Documents" and in the project's document list (if project-linked). The document's project association is preserved independently of the task link.
+
+### C10: Pagination for document lists
+**Question**: How should large document lists be handled for performance?
+**Resolution**: Document list views must use server-side pagination with 20 documents per page by default. The page displays total document count and page navigation controls. Sorting and filtering apply across the full dataset (not just the current page).
 
 ---
 
